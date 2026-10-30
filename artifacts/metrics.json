@@ -1,0 +1,159 @@
+{
+  "model": "artifacts/recognizer.onnx",
+  "input": [
+    1,
+    1,
+    32,
+    160
+  ],
+  "charset": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+  "latency_by_threads": {
+    "1": {
+      "n": 300,
+      "mean_ms": 0.6931641499947242,
+      "p50_ms": 0.6763600000567749,
+      "p95_ms": 0.78647930004081,
+      "min_ms": 0.6622379999043915,
+      "threads": 1
+    },
+    "4": {
+      "n": 300,
+      "mean_ms": 0.2899488699934712,
+      "p50_ms": 0.2817600000071252,
+      "p95_ms": 0.35525755007483895,
+      "min_ms": 0.25158500011457363,
+      "threads": 4
+    }
+  },
+  "latency": {
+    "n": 300,
+    "mean_ms": 0.2899488699934712,
+    "p50_ms": 0.2817600000071252,
+    "p95_ms": 0.35525755007483895,
+    "min_ms": 0.25158500011457363,
+    "threads": 4
+  },
+  "end_to_end_samples": {
+    "n": 300,
+    "mean_ms": 0.3813452033341491,
+    "p50_ms": 0.3608854999583855,
+    "p95_ms": 0.5118924999123919
+  },
+  "fresh_standard": {
+    "n": 2000,
+    "exact_accuracy": 0.971,
+    "character_accuracy": 0.995049504950495,
+    "character_error_rate": 0.0049504950495049506,
+    "top_substitutions": [
+      {
+        "change": "O->0",
+        "count": 27
+      },
+      {
+        "change": "0->O",
+        "count": 11
+      },
+      {
+        "change": "L->I",
+        "count": 10
+      },
+      {
+        "change": "I->L",
+        "count": 5
+      },
+      {
+        "change": "1->L",
+        "count": 1
+      }
+    ],
+    "augment": "standard"
+  },
+  "fresh_messy": {
+    "n": 1000,
+    "exact_accuracy": 0.875,
+    "character_accuracy": 0.9687655756770228,
+    "character_error_rate": 0.03123442432297724,
+    "top_substitutions": [
+      {
+        "change": "O->0",
+        "count": 19
+      },
+      {
+        "change": "L->I",
+        "count": 4
+      },
+      {
+        "change": "0->O",
+        "count": 4
+      },
+      {
+        "change": "1->I",
+        "count": 2
+      },
+      {
+        "change": "G->E",
+        "count": 2
+      },
+      {
+        "change": "O->A",
+        "count": 1
+      },
+      {
+        "change": "2->Z",
+        "count": 1
+      },
+      {
+        "change": "R->N",
+        "count": 1
+      }
+    ],
+    "augment": "messy"
+  },
+  "heldout_font": {
+    "n": 1000,
+    "exact_accuracy": 0.869,
+    "character_accuracy": 0.9761984021304927,
+    "character_error_rate": 0.023801597869507325,
+    "top_substitutions": [
+      {
+        "change": "O->0",
+        "count": 30
+      },
+      {
+        "change": "0->O",
+        "count": 30
+      },
+      {
+        "change": "Q->G",
+        "count": 16
+      },
+      {
+        "change": "4->U",
+        "count": 12
+      },
+      {
+        "change": "R->N",
+        "count": 11
+      },
+      {
+        "change": "I->L",
+        "count": 5
+      },
+      {
+        "change": "4->L",
+        "count": 2
+      },
+      {
+        "change": "9->Y",
+        "count": 2
+      }
+    ],
+    "augment": "standard",
+    "fonts": [
+      "Cantarell-Regular.otf",
+      "Cantarell-Bold.otf",
+      "JetBrainsMono-Regular.ttf",
+      "CascadiaMono.ttf"
+    ]
+  }
+}
