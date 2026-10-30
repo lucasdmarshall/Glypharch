@@ -1,0 +1,125 @@
+{
+  "model": "artifacts/handwriting.onnx",
+  "latency": {
+    "n": 200,
+    "mean_ms": 0.2552137399811727,
+    "p50_ms": 0.2518489998237783,
+    "p95_ms": 0.2971520498931568,
+    "min_ms": 0.23888899977464462,
+    "threads": 4
+  },
+  "emnist_lines": {
+    "n": 2000,
+    "exact_accuracy": 0.453,
+    "character_accuracy": 0.8721261956704145,
+    "character_error_rate": 0.1278738043295855,
+    "top_substitutions": [
+      {
+        "change": "O->0",
+        "count": 108
+      },
+      {
+        "change": "0->O",
+        "count": 100
+      },
+      {
+        "change": "L->1",
+        "count": 90
+      },
+      {
+        "change": "1->L",
+        "count": 83
+      },
+      {
+        "change": "I->1",
+        "count": 80
+      },
+      {
+        "change": "1->I",
+        "count": 58
+      },
+      {
+        "change": "Q->9",
+        "count": 55
+      },
+      {
+        "change": "L->I",
+        "count": 54
+      }
+    ],
+    "source": "EMNIST digits+letters official test characters, composed into lines"
+  },
+  "chars74k_heldout_writers": {
+    "n": 1000,
+    "exact_accuracy": 0.471,
+    "character_accuracy": 0.8765575677022761,
+    "character_error_rate": 0.12344243229772388,
+    "top_substitutions": [
+      {
+        "change": "O->0",
+        "count": 95
+      },
+      {
+        "change": "9->G",
+        "count": 36
+      },
+      {
+        "change": "0->O",
+        "count": 33
+      },
+      {
+        "change": "Q->9",
+        "count": 26
+      },
+      {
+        "change": "S->B",
+        "count": 23
+      },
+      {
+        "change": "I->1",
+        "count": 22
+      },
+      {
+        "change": "1->7",
+        "count": 20
+      },
+      {
+        "change": "L->1",
+        "count": 19
+      }
+    ],
+    "writers": "46-55"
+  },
+  "printed_replay_check": {
+    "n": 1000,
+    "exact_accuracy": 0.955,
+    "character_accuracy": 0.9923435419440746,
+    "character_error_rate": 0.007656458055925432,
+    "top_substitutions": [
+      {
+        "change": "O->0",
+        "count": 15
+      },
+      {
+        "change": "L->I",
+        "count": 8
+      },
+      {
+        "change": "0->O",
+        "count": 7
+      },
+      {
+        "change": "I->L",
+        "count": 3
+      },
+      {
+        "change": "M->L",
+        "count": 1
+      },
+      {
+        "change": "Y->W",
+        "count": 1
+      }
+    ]
+  }
+}

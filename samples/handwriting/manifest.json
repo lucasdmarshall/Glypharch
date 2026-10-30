@@ -1,0 +1,22 @@
+[
+  {
+    "file": "samples/handwriting/7F2K.png",
+    "text": "7F2K",
+    "prediction": "7F2K"
+  },
+  {
+    "file": "samples/handwriting/A0B18.png",
+    "text": "A0B18",
+    "prediction": "AOB18"
+  },
+  {
+    "file": "samples/handwriting/MN94Q.png",
+    "text": "MN94Q",
+    "prediction": "MN94Q"
+  },
+  {
+    "file": "samples/handwriting/HELLO.png",
+    "text": "HELLO",
+    "prediction": "HE1LO"
+  }
+]

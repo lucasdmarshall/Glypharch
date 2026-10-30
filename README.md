@@ -73,7 +73,34 @@ python -m tinyocr export
 
 `train` က 10% ကို validation အဖြစ် ခွဲပြီး `val_exact` ပုံနှိပ်တယ်။ `bench` က synthetic distribution ကိုပဲ ပြန်တိုင်းတယ်။ ကိုယ့်ဓာတ်ပုံ accuracy က အဲဒီ `val_exact` ပါ။ Validation အနည်းငယ်ပဲရှိရင် ဂဏန်းက လှုပ်တယ်။
 
-မြန်မာစာအတွက်လည်း လမ်းက အတူတူပါ။ `tinyocr/config.py` ထဲက `CHARSET` ကို မြန်မာစာလုံးတွေနဲ့ လဲ၊ `Noto Sans Myanmar` လို font ကို `--font` နဲ့ပေး၊ စာကြောင်းပိုရှည်ရင် `IMG_W` ကို 4 နဲ့စားပြတ်အောင် ချဲ့ပါ။ ပြီးမှ အပေါ်က train / export / bench ကို ပြန်လုပ်ပါ။ ဒီ 97% က လက်တင်ကုဒ်တိုအတွက်ပဲ တိုင်းထားတာပါ။
+## လက်ရေး fine-tune
+
+Charset က `0-9` / `A-Z` အတိုင်းပါ။ လက်ရေးဒေတာနှစ်ခုကို စာကြောင်းတိုဖြစ်အောင် ပေါင်းထားတယ်။
+
+- **EMNIST Digits** နဲ့ **EMNIST Letters** — NIST Special Database 19 က လက်ရေးဂဏန်းနဲ့ အက္ခရာ (Cohen, Afshar, Tapson, van Schaik, 2017)။ Train/test က official split။
+- **Chars74k EnglishHnd** — tablet နဲ့ဆွဲထားတဲ့ လက်ရေး၊ စာရေးသူ 55 ယောက် (de Campos, Babu, Varma, VISAPP 2009)။ စာရေးသူ 1–45 ကို သင်တယ်။ 46–55 ကို စာမသင်ဘဲ စမ်းတယ်။
+
+ဒါက စာလုံးတစ်လုံးချင်းကို စာကြောင်းပေါ် တင်ထားတဲ့ hand-printed လိုင်းပါ။ စာလုံးချင်းဆက်ထားတဲ့ cursive စာလုံးတွဲ မဟုတ်ပါ။
+
+ပုံနှိပ် checkpoint ကနေ fine-tune လုပ်ထားတဲ့ model က `artifacts/handwriting.onnx` ပါ။ တူညီတဲ့ 4-core Xeon, ONNX Runtime CPU, batch 1 မှာ latency p50 **0.25 ms**, p95 **0.30 ms**။
+
+| စမ်းသပ်ချက် | exact | character | n |
+| --- | --- | --- | --- |
+| EMNIST test စာလုံးတွေနဲ့ ဆွဲထားတဲ့ လိုင်း | 45.3% | 87.2% | 2000 |
+| Chars74k စာရေးသူ 46–55 | 47.1% | 87.7% | 1000 |
+| ပုံနှိပ်စာ (replay စစ်ဆေးချက်) | 95.5% | 99.2% | 1000 |
+
+စာလုံး 6 လုံးလောက်ရှိတဲ့ လိုင်းမှာ character 87% ဆိုရင် exact က 45% ဝန်းကျင်ရောက်တယ်။ ကျန်တဲ့အမှားက လက်ရေးမှာ ပုံပန်းတူတဲ့ `O`/`0`၊ `I`/`1`/`L`၊ `Q`/`9` ပါ။ ပုံနှိပ်စာ exact က 97.1% ကနေ 95.5% ကို ဆင်းသွားတယ်။
+
+```bash
+pip install -r requirements-train.txt
+python -m tinyocr train-hand --init artifacts/recognizer.pt --epochs 8 --lr 5e-4 --seed 0
+python -m tinyocr train-hand --init artifacts/handwriting.pt --epochs 4 --lr 2e-4 --seed 1
+python -m tinyocr bench-hand
+python -m tinyocr read --model artifacts/handwriting.onnx samples/handwriting/7F2K.png
+```
+
+`train-hand` က `data/handwriting/` ထဲကို EMNIST zip နဲ့ Chars74k ကို မရှိသေးရင် ဒေါင်းပြီး၊ လိုင်းဆွဲ၊ fine-tune လုပ်၊ ONNX ပြန်ထုတ်တယ်။ Raw ဒေတာကို git ထဲ မထည့်ပါ။
 
 ## ပုံဝင်လာပုံ
 

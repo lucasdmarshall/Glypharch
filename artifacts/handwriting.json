@@ -1,0 +1,10 @@
+{
+  "charset": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+  "blank": 0,
+  "height": 32,
+  "width": 160,
+  "input_name": "image",
+  "output_name": "log_probs",
+  "val_exact": 0.4485,
+  "val_character_accuracy": 0.8722055388722055
+}
