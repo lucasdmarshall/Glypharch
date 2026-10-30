@@ -201,7 +201,20 @@ def load_emnist(gzip_dir: Path, split: str) -> IndexedGlyphs:
     return IndexedGlyphs(images, np.concatenate(relabeled), mapping)
 
 
-def load_chars74k(img_root: Path, writer_min: int, writer_max: int) -> ListedGlyphs:
+def _limit_height(glyph: np.ndarray, max_height: int) -> np.ndarray:
+    """Cap a glyph's height. The default cap keeps the 32px benches unchanged."""
+    if glyph.shape[0] <= max_height:
+        return np.ascontiguousarray(glyph)
+    new_w = max(1, int(round(glyph.shape[1] * (max_height / glyph.shape[0]))))
+    resized = np.asarray(
+        Image.fromarray(glyph).resize((new_w, max_height), Image.Resampling.BILINEAR)
+    )
+    return np.ascontiguousarray(resized)
+
+
+def load_chars74k(
+    img_root: Path, writer_min: int, writer_max: int, max_height: int = 48
+) -> ListedGlyphs:
     by_char: dict[str, list[np.ndarray]] = {char: [] for char in CHARSET}
     for class_dir in sorted(img_root.glob("Sample*")):
         class_index = int(class_dir.name.replace("Sample", "")) - 1
@@ -215,13 +228,8 @@ def load_chars74k(img_root: Path, writer_min: int, writer_max: int) -> ListedGly
             gray = np.asarray(Image.open(path).convert("L"))
             if float(gray.mean()) < 127:
                 gray = 255 - gray
-            glyph = crop_ink(gray)
-            if glyph.shape[0] > 48:
-                new_w = max(1, int(round(glyph.shape[1] * (48 / glyph.shape[0]))))
-                glyph = np.asarray(
-                    Image.fromarray(glyph).resize((new_w, 48), Image.Resampling.BILINEAR)
-                )
-            by_char[char].append(np.ascontiguousarray(glyph))
+            glyph = _limit_height(crop_ink(gray), max_height)
+            by_char[char].append(glyph)
     missing = [char for char, glyphs in by_char.items() if not glyphs]
     if missing:
         raise RuntimeError(f"Chars74k is missing {''.join(missing)} for writers {writer_min}-{writer_max}")
@@ -243,9 +251,14 @@ def blit_min(canvas: np.ndarray, glyph: np.ndarray, x: int, y: int) -> None:
     np.minimum(region, src, out=region)
 
 
-def _fit_glyph(glyph: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+def _fit_glyph(
+    glyph: np.ndarray,
+    rng: np.random.Generator,
+    height_low: int = 20,
+    height_high: int = 32,
+) -> np.ndarray:
     image = Image.fromarray(glyph, mode="L")
-    target_h = int(rng.integers(20, 32))
+    target_h = int(rng.integers(height_low, height_high))
     target_w = max(1, int(round(image.width * (target_h / max(image.height, 1)))))
     image = image.resize((target_w, target_h), Image.Resampling.BILINEAR)
     angle = float(rng.uniform(-8.0, 8.0))
@@ -283,6 +296,10 @@ def render_hand_line(
     text: str | None = None,
     confusable_rate: float = 0.0,
     stroke_prob: float = 0.0,
+    glyph_low: int = 20,
+    glyph_high: int = 32,
+    canvas_height: int = 52,
+    baseline: int = 40,
 ) -> tuple[Image.Image, str]:
     if text is None:
         # A zero rate must not draw from the rng, so the bench lines stay fixed.
@@ -290,14 +307,16 @@ def render_hand_line(
             text = confusable_line(rng)
         else:
             text = random_text(rng, MIN_LEN, MAX_LEN)
-    glyphs = [_fit_glyph(bank.sample(char, rng), rng) for char in text]
+    glyphs = [
+        _fit_glyph(bank.sample(char, rng), rng, glyph_low, glyph_high) for char in text
+    ]
     gaps = [int(rng.integers(-1, 5)) for _ in glyphs]
     width = 12 + sum(glyph.shape[1] for glyph in glyphs) + sum(gaps)
     width = max(width, 16)
-    canvas = np.full((52, width), 255, dtype=np.uint8)
+    canvas = np.full((canvas_height, width), 255, dtype=np.uint8)
     x = 4
     for glyph, gap in zip(glyphs, gaps):
-        y = 40 - glyph.shape[0] + int(rng.integers(-2, 3))
+        y = baseline - glyph.shape[0] + int(rng.integers(-2, 3))
         blit_min(canvas, glyph, x, y)
         x += glyph.shape[1] + gap
     image = Image.fromarray(canvas, mode="L")
@@ -330,15 +349,28 @@ def materialize(
     seed: int,
     confusable_rate: float = 0.0,
     stroke_prob: float = 0.0,
+    height: int = IMG_H,
+    width: int = IMG_W,
+    glyph_low: int = 20,
+    glyph_high: int = 32,
+    canvas_height: int = 52,
+    baseline: int = 40,
 ) -> tuple[np.ndarray, list[str]]:
-    images = np.empty((count, 1, IMG_H, IMG_W), dtype=np.float32)
+    images = np.empty((count, 1, height, width), dtype=np.float32)
     texts: list[str] = []
     for index in range(count):
         rng = np.random.default_rng(child_seed(seed, index))
         image, text = render_hand_line(
-            bank, rng, confusable_rate=confusable_rate, stroke_prob=stroke_prob
+            bank,
+            rng,
+            confusable_rate=confusable_rate,
+            stroke_prob=stroke_prob,
+            glyph_low=glyph_low,
+            glyph_high=glyph_high,
+            canvas_height=canvas_height,
+            baseline=baseline,
         )
-        images[index] = prepare_line(image, IMG_H, IMG_W)
+        images[index] = prepare_line(image, height, width)
         texts.append(text)
         if (index + 1) % 5000 == 0 or index + 1 == count:
             print(f"  rendered {index + 1}/{count}", flush=True)

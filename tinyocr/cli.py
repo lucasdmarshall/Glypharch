@@ -14,9 +14,9 @@ def _read(args: argparse.Namespace) -> int:
     session = load_session(args.model, threads=args.threads)
     with Image.open(args.image) as image:
         for _ in range(10):
-            predict_image(session, spec, image)
+            predict_image(session, spec, image, alphabet=args.alphabet)
         started = time.perf_counter()
-        text = predict_image(session, spec, image)
+        text = predict_image(session, spec, image, alphabet=args.alphabet)
         elapsed = (time.perf_counter() - started) * 1000.0
     print(text)
     print(f"{elapsed:.3f} ms")
@@ -50,6 +50,8 @@ def main(argv: list[str] | None = None) -> int:
     hand = sub.add_parser("train-hand", help="Fine-tune on EMNIST and Chars74k handwriting")
     hand_bench = sub.add_parser("bench-hand", help="Score the handwriting model on held-out glyphs")
     overlap = sub.add_parser("overlap", help="Measure pixel overlap of confusable EMNIST glyphs")
+    detail = sub.add_parser("train-detail", help="Train a height-64 model on sharp Chars74k lines")
+    detail_bench = sub.add_parser("bench-detail", help="Score the height-64 model against the 32px model")
     samples = sub.add_parser("samples", help="Write a few demo line images")
 
     train.add_argument("--epochs", type=int, default=10)
@@ -77,6 +79,12 @@ def main(argv: list[str] | None = None) -> int:
 
     read.add_argument("image", type=Path)
     read.add_argument("--model", type=Path, default=Path("artifacts/recognizer.onnx"))
+    read.add_argument(
+        "--alphabet",
+        choices=("digits", "letters"),
+        default=None,
+        help="Mask CTC classes when the field format is known. Digits forbids O. Letters forbids 0 and 1.",
+    )
     read.add_argument(
         "--threads",
         type=int,
@@ -109,6 +117,27 @@ def main(argv: list[str] | None = None) -> int:
     overlap.add_argument("--seed", type=int, default=2026)
     overlap.add_argument("--out", type=Path, default=Path("artifacts/confusable-ceiling.json"))
 
+    detail.add_argument("--epochs", type=int, default=8)
+    detail.add_argument("--train-size", type=int, default=14000)
+    detail.add_argument("--val-size", type=int, default=1000)
+    detail.add_argument("--batch-size", type=int, default=128)
+    detail.add_argument("--lr", type=float, default=5e-4)
+    detail.add_argument("--replay", type=float, default=0.2)
+    detail.add_argument("--seed", type=int, default=3)
+    detail.add_argument("--confusable-rate", type=float, default=0.4)
+    detail.add_argument("--stroke-prob", type=float, default=0.5)
+    detail.add_argument("--init", type=Path, default=Path("artifacts/handwriting.pt"))
+    detail.add_argument("--out", type=Path, default=Path("artifacts/detail.pt"))
+    detail.add_argument("--data-dir", type=Path, default=Path("data/handwriting"))
+
+    detail_bench.add_argument("--model", type=Path, default=Path("artifacts/detail.onnx"))
+    detail_bench.add_argument("--baseline", type=Path, default=Path("artifacts/handwriting.onnx"))
+    detail_bench.add_argument("--n", type=int, default=1000)
+    detail_bench.add_argument("--seed", type=int, default=2026)
+    detail_bench.add_argument("--repeats", type=int, default=200)
+    detail_bench.add_argument("--out", type=Path, default=Path("artifacts/detail-metrics.json"))
+    detail_bench.add_argument("--data-dir", type=Path, default=Path("data/handwriting"))
+
     samples.add_argument("--out", type=Path, default=Path("samples"))
 
     args = parser.parse_args(argv)
@@ -139,6 +168,14 @@ def main(argv: list[str] | None = None) -> int:
         from tinyocr.handwriting import write_overlap
 
         return write_overlap(args)
+    if args.cmd == "train-detail":
+        from tinyocr.detail import train_detail
+
+        return train_detail(args)
+    if args.cmd == "bench-detail":
+        from tinyocr.detail import bench_detail
+
+        return bench_detail(args)
     if args.cmd == "samples":
         return _samples(args)
     raise SystemExit(f"unknown command {args.cmd}")

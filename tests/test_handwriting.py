@@ -8,10 +8,12 @@ from PIL import Image
 
 from tinyocr.charset import encode
 from tinyocr.handwriting import (
+    _limit_height,
     blit_min,
     confusable_line,
     crop_ink,
     ctc_sample_weights,
+    materialize,
     read_idx_images,
     read_idx_labels,
     read_mapping,
@@ -94,6 +96,55 @@ def test_render_accepts_a_forced_confusable_line():
     assert text == "O0"
     assert image.mode == "L"
     assert image.getextrema()[0] < 255
+
+
+class _StrokeBank:
+    def sample(self, _char, _rng):
+        glyph = np.full((10, 6), 255, dtype=np.uint8)
+        glyph[2:8, 2:4] = 0
+        return glyph
+
+
+def test_default_geometry_matches_explicit_defaults():
+    bank = _StrokeBank()
+    left, left_text = render_hand_line(bank, np.random.default_rng(7), text="AB12")
+    right, right_text = render_hand_line(
+        bank,
+        np.random.default_rng(7),
+        text="AB12",
+        glyph_low=20,
+        glyph_high=32,
+        canvas_height=52,
+        baseline=40,
+    )
+    assert left_text == right_text == "AB12"
+    assert np.array_equal(np.asarray(left), np.asarray(right))
+
+
+def test_materialize_defaults_stay_32_and_detail_is_64():
+    images, texts = materialize(_StrokeBank(), 2, seed=1)
+    assert images.shape == (2, 1, 32, 160)
+    assert len(texts) == 2
+    tall, _ = materialize(
+        _StrokeBank(),
+        2,
+        seed=1,
+        height=64,
+        width=160,
+        glyph_low=40,
+        glyph_high=65,
+        canvas_height=112,
+        baseline=96,
+    )
+    assert tall.shape == (2, 1, 64, 160)
+
+
+def test_limit_height_keeps_short_glyphs_and_caps_tall_ones():
+    short = np.zeros((40, 10), dtype=np.uint8)
+    assert _limit_height(short, 48).shape == (40, 10)
+    tall = np.zeros((96, 20), dtype=np.uint8)
+    assert _limit_height(tall, 48).shape == (48, 10)
+    assert _limit_height(tall, 128).shape == (96, 20)
 
 
 def test_crop_and_darker_ink_wins():

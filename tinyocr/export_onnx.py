@@ -10,8 +10,8 @@ import onnx
 import torch
 
 from tinyocr.charset import CHARSET
-from tinyocr.config import BLANK, IMG_H, IMG_W
-from tinyocr.model import TinyRecognizer
+from tinyocr.config import BLANK, DETAIL_H, DETAIL_W, IMG_H, IMG_W
+from tinyocr.model import recognizer_for
 
 
 def export_checkpoint(checkpoint: Path, out: Path) -> None:
@@ -19,12 +19,17 @@ def export_checkpoint(checkpoint: Path, out: Path) -> None:
         ckpt = torch.load(checkpoint, map_location="cpu", weights_only=True)
     except TypeError:
         ckpt = torch.load(checkpoint, map_location="cpu")
-    if ckpt.get("charset") != CHARSET or ckpt.get("height") != IMG_H or ckpt.get("width") != IMG_W:
+    height = ckpt.get("height")
+    width = ckpt.get("width")
+    if ckpt.get("charset") != CHARSET or (height, width) not in (
+        (IMG_H, IMG_W),
+        (DETAIL_H, DETAIL_W),
+    ):
         raise SystemExit("checkpoint contract does not match this package config")
-    model = TinyRecognizer(len(CHARSET) + 1)
+    model = recognizer_for(int(height), len(CHARSET) + 1)
     model.load_state_dict(ckpt["model"])
     model.eval()
-    dummy = torch.zeros(1, 1, IMG_H, IMG_W, dtype=torch.float32)
+    dummy = torch.zeros(1, 1, int(height), int(width), dtype=torch.float32)
     out.parent.mkdir(parents=True, exist_ok=True)
     kwargs = dict(
         input_names=["image"],
@@ -45,8 +50,8 @@ def export_checkpoint(checkpoint: Path, out: Path) -> None:
     meta = {
         "charset": CHARSET,
         "blank": BLANK,
-        "height": IMG_H,
-        "width": IMG_W,
+        "height": int(height),
+        "width": int(width),
         "input_name": "image",
         "output_name": "log_probs",
         "val_exact": ckpt.get("val_exact"),

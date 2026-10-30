@@ -99,6 +99,21 @@ class SynthSource:
             for size in sizes:
                 self.faces.append(ImageFont.truetype(path, size=size))
 
+    def render_sample(
+        self,
+        index: int,
+        seed: int,
+        augment: Augment,
+        min_len: int = MIN_LEN,
+        max_len: int = MAX_LEN,
+    ) -> tuple[Image.Image, str]:
+        rng = np.random.default_rng(child_seed(seed, index))
+        text = random_text(rng, min_len, max_len)
+        face = self.faces[int(rng.integers(0, len(self.faces)))]
+        shown = _shown_text(text, rng, augment)
+        image = render_text(shown, face, rng, augment)
+        return image, text
+
     def sample(
         self,
         index: int,
@@ -106,25 +121,24 @@ class SynthSource:
         augment: Augment,
         min_len: int = MIN_LEN,
         max_len: int = MAX_LEN,
+        height: int = IMG_H,
+        width: int = IMG_W,
     ) -> tuple[np.ndarray, str]:
-        rng = np.random.default_rng(child_seed(seed, index))
-        text = random_text(rng, min_len, max_len)
-        face = self.faces[int(rng.integers(0, len(self.faces)))]
-        shown = _shown_text(text, rng, augment)
-        image = render_text(shown, face, rng, augment)
-        tensor = prepare_line(image, IMG_H, IMG_W)
-        return tensor, text
+        image, text = self.render_sample(index, seed, augment, min_len, max_len)
+        return prepare_line(image, height, width), text
 
     def materialize(
         self,
         count: int,
         seed: int,
         augment: Augment,
+        height: int = IMG_H,
+        width: int = IMG_W,
     ) -> tuple[np.ndarray, list[str]]:
-        images = np.empty((count, 1, IMG_H, IMG_W), dtype=np.float32)
+        images = np.empty((count, 1, height, width), dtype=np.float32)
         texts: list[str] = []
         for i in range(count):
-            tensor, text = self.sample(i, seed, augment)
+            tensor, text = self.sample(i, seed, augment, height=height, width=width)
             images[i] = tensor
             texts.append(text)
             if (i + 1) % 5000 == 0 or i + 1 == count:

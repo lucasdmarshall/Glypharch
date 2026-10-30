@@ -135,15 +135,22 @@ def run_epoch(
     return total / max(seen, 1)
 
 
-def save_checkpoint(path: Path, model: TinyRecognizer, epoch: int, metrics: dict) -> None:
+def save_checkpoint(
+    path: Path,
+    model: nn.Module,
+    epoch: int,
+    metrics: dict,
+    height: int = IMG_H,
+    width: int = IMG_W,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {
             "model": model.state_dict(),
             "charset": CHARSET,
             "blank": BLANK,
-            "height": IMG_H,
-            "width": IMG_W,
+            "height": height,
+            "width": width,
             "epoch": epoch,
             "val_exact": metrics["exact_accuracy"],
             "val_character_accuracy": metrics["character_accuracy"],
@@ -159,11 +166,11 @@ def load_checkpoint(path: Path) -> dict:
         return torch.load(path, map_location="cpu")
 
 
-def load_init(model: TinyRecognizer, path: Path) -> None:
+def load_init(model: nn.Module, path: Path, strict: bool = True) -> None:
     ckpt = load_checkpoint(path)
     if ckpt.get("charset") != CHARSET:
         raise SystemExit(f"{path} was trained with a different charset")
-    model.load_state_dict(ckpt["model"])
+    model.load_state_dict(ckpt["model"], strict=strict)
 
 
 def train(args: argparse.Namespace) -> int:

@@ -8,6 +8,8 @@ emits one feature vector per time step, so greedy CTC can read it directly.
 import torch
 from torch import nn
 
+from tinyocr.config import DETAIL_H, IMG_H
+
 
 class ConvBNAct(nn.Module):
     def __init__(self, in_ch: int, out_ch: int):
@@ -45,3 +47,45 @@ class TinyRecognizer(nn.Module):
         y = y[:, :, 0, :]
         y = y.transpose(1, 2)
         return self.fc(y).log_softmax(dim=-1)
+
+
+class DetailRecognizer(nn.Module):
+    """TinyRecognizer plus one height pool, for a 64px line.
+
+    The extra pool has no parameters. A 32px checkpoint loads into the
+    conv and linear weights. Width is still pooled twice, so a 160px
+    line is still 40 time steps.
+    """
+
+    def __init__(self, nclass: int):
+        super().__init__()
+        if nclass < 2:
+            raise ValueError("need a blank plus at least one character")
+        self.cnn = nn.Sequential(
+            ConvBNAct(1, 32),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            ConvBNAct(32, 64),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            ConvBNAct(64, 128),
+            nn.MaxPool2d(kernel_size=(2, 1), stride=(2, 1)),
+            ConvBNAct(128, 128),
+            nn.MaxPool2d(kernel_size=(2, 1), stride=(2, 1)),
+            ConvBNAct(128, 128),
+            nn.MaxPool2d(kernel_size=(2, 1), stride=(2, 1)),
+            nn.MaxPool2d(kernel_size=(2, 1), stride=(2, 1)),
+        )
+        self.fc = nn.Linear(128, nclass)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        y = self.cnn(x)
+        y = y[:, :, 0, :]
+        y = y.transpose(1, 2)
+        return self.fc(y).log_softmax(dim=-1)
+
+
+def recognizer_for(height: int, nclass: int) -> nn.Module:
+    if height == IMG_H:
+        return TinyRecognizer(nclass)
+    if height == DETAIL_H:
+        return DetailRecognizer(nclass)
+    raise ValueError(f"unsupported input height {height}")

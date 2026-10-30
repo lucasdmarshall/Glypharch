@@ -58,7 +58,8 @@ def predict_image(
     session: ort.InferenceSession,
     spec: dict,
     image: Image.Image,
+    alphabet: str | None = None,
 ) -> str:
     tensor = prepare_line(image, int(spec["height"]), int(spec["width"]))
     log_probs = predict_batch(session, spec, tensor[None, ...])
-    return greedy_decode(log_probs, spec["charset"])[0]
+    return greedy_decode(log_probs, spec["charset"], alphabet=alphabet)[0]

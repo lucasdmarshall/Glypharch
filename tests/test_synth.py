@@ -23,3 +23,5 @@ def test_sample_is_deterministic_and_in_charset():
     assert 4 <= len(text) <= 8
     assert set(text) <= set(CHARSET)
     assert first.shape == (1, 32, 160)
+    tall, _ = source.sample(3, seed=7, augment=STANDARD, height=64, width=160)
+    assert tall.shape == (1, 64, 160)
