@@ -49,6 +49,7 @@ def main(argv: list[str] | None = None) -> int:
     read = sub.add_parser("read", help="Read one line image")
     hand = sub.add_parser("train-hand", help="Fine-tune on EMNIST and Chars74k handwriting")
     hand_bench = sub.add_parser("bench-hand", help="Score the handwriting model on held-out glyphs")
+    overlap = sub.add_parser("overlap", help="Measure pixel overlap of confusable EMNIST glyphs")
     samples = sub.add_parser("samples", help="Write a few demo line images")
 
     train.add_argument("--epochs", type=int, default=10)
@@ -90,6 +91,8 @@ def main(argv: list[str] | None = None) -> int:
     hand.add_argument("--lr", type=float, default=5e-4)
     hand.add_argument("--replay", type=float, default=0.2)
     hand.add_argument("--seed", type=int, default=0)
+    hand.add_argument("--confusable-rate", type=float, default=0.0)
+    hand.add_argument("--stroke-prob", type=float, default=0.0)
     hand.add_argument("--init", type=Path, default=Path("artifacts/recognizer.pt"))
     hand.add_argument("--out", type=Path, default=Path("artifacts/handwriting.pt"))
     hand.add_argument("--data-dir", type=Path, default=Path("data/handwriting"))
@@ -100,6 +103,11 @@ def main(argv: list[str] | None = None) -> int:
     hand_bench.add_argument("--repeats", type=int, default=200)
     hand_bench.add_argument("--out", type=Path, default=Path("artifacts/handwriting-metrics.json"))
     hand_bench.add_argument("--data-dir", type=Path, default=Path("data/handwriting"))
+
+    overlap.add_argument("--data-dir", type=Path, default=Path("data/handwriting"))
+    overlap.add_argument("--per-class", type=int, default=300)
+    overlap.add_argument("--seed", type=int, default=2026)
+    overlap.add_argument("--out", type=Path, default=Path("artifacts/confusable-ceiling.json"))
 
     samples.add_argument("--out", type=Path, default=Path("samples"))
 
@@ -127,6 +135,10 @@ def main(argv: list[str] | None = None) -> int:
         from tinyocr.handwriting import bench_hand
 
         return bench_hand(args)
+    if args.cmd == "overlap":
+        from tinyocr.handwriting import write_overlap
+
+        return write_overlap(args)
     if args.cmd == "samples":
         return _samples(args)
     raise SystemExit(f"unknown command {args.cmd}")

@@ -30,6 +30,9 @@ CHARS74K_URL = "https://info-ee.surrey.ac.uk/CVSSP/demos/chars74k/EnglishHnd.tgz
 CHARS74K_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 # Writers 46-55 stay out of training. Chars74k has 55 writers, numbered 1-55.
 HELDOUT_WRITER_MIN = 46
+# Glyphs that dominate the remaining handwriting errors.
+CONFUSABLE = "O0I1LQ9"
+CONFUSABLE_GROUPS = ("O0", "I1L", "Q9")
 
 _EMNIST_FILES = (
     "emnist-digits-mapping.txt",
@@ -250,9 +253,43 @@ def _fit_glyph(glyph: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     return np.asarray(image)
 
 
-def render_hand_line(bank, rng: np.random.Generator, text: str | None = None) -> tuple[Image.Image, str]:
+def confusable_line(
+    rng: np.random.Generator, min_len: int = MIN_LEN, max_len: int = MAX_LEN
+) -> str:
+    """A random line with at least two glyphs from the confusable set, then shuffled."""
+    length = int(rng.integers(min_len, max_len + 1))
+    chars = [CHARSET[int(index)] for index in rng.integers(0, len(CHARSET), size=length)]
+    for slot in rng.choice(length, size=2, replace=False):
+        chars[int(slot)] = CONFUSABLE[int(rng.integers(0, len(CONFUSABLE)))]
+    rng.shuffle(chars)
+    return "".join(chars)
+
+
+def ctc_sample_weights(targets: list[int], lengths: list[int]) -> list[float]:
+    """Give confusable labels twice the CTC weight. Other labels stay at 1."""
+    confusable_ids = {CHARSET.index(char) + 1 for char in CONFUSABLE}
+    weights: list[float] = []
+    offset = 0
+    for length in lengths:
+        chunk = targets[offset : offset + length]
+        offset += length
+        weights.append(2.0 if any(index in confusable_ids for index in chunk) else 1.0)
+    return weights
+
+
+def render_hand_line(
+    bank,
+    rng: np.random.Generator,
+    text: str | None = None,
+    confusable_rate: float = 0.0,
+    stroke_prob: float = 0.0,
+) -> tuple[Image.Image, str]:
     if text is None:
-        text = random_text(rng, MIN_LEN, MAX_LEN)
+        # A zero rate must not draw from the rng, so the bench lines stay fixed.
+        if confusable_rate > 0 and float(rng.random()) < confusable_rate:
+            text = confusable_line(rng)
+        else:
+            text = random_text(rng, MIN_LEN, MAX_LEN)
     glyphs = [_fit_glyph(bank.sample(char, rng), rng) for char in text]
     gaps = [int(rng.integers(-1, 5)) for _ in glyphs]
     width = 12 + sum(glyph.shape[1] for glyph in glyphs) + sum(gaps)
@@ -264,6 +301,12 @@ def render_hand_line(bank, rng: np.random.Generator, text: str | None = None) ->
         blit_min(canvas, glyph, x, y)
         x += glyph.shape[1] + gap
     image = Image.fromarray(canvas, mode="L")
+    if stroke_prob > 0 and float(rng.random()) < stroke_prob:
+        # MinFilter spreads dark ink by one pixel. MaxFilter thins it.
+        if float(rng.random()) < 0.5:
+            image = image.filter(ImageFilter.MinFilter(3))
+        else:
+            image = image.filter(ImageFilter.MaxFilter(3))
     shear = float(rng.uniform(-0.15, 0.15))
     image = image.transform(
         image.size,
@@ -281,17 +324,124 @@ def render_hand_line(bank, rng: np.random.Generator, text: str | None = None) ->
     return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), mode="L"), text
 
 
-def materialize(bank, count: int, seed: int) -> tuple[np.ndarray, list[str]]:
+def materialize(
+    bank,
+    count: int,
+    seed: int,
+    confusable_rate: float = 0.0,
+    stroke_prob: float = 0.0,
+) -> tuple[np.ndarray, list[str]]:
     images = np.empty((count, 1, IMG_H, IMG_W), dtype=np.float32)
     texts: list[str] = []
     for index in range(count):
         rng = np.random.default_rng(child_seed(seed, index))
-        image, text = render_hand_line(bank, rng)
+        image, text = render_hand_line(
+            bank, rng, confusable_rate=confusable_rate, stroke_prob=stroke_prob
+        )
         images[index] = prepare_line(image, IMG_H, IMG_W)
         texts.append(text)
         if (index + 1) % 5000 == 0 or index + 1 == count:
             print(f"  rendered {index + 1}/{count}", flush=True)
     return images, texts
+
+
+def _weighted_epoch(model, loader, criterion, optimizer) -> float:
+    """CTC loss with a higher weight on lines that contain a confusable glyph."""
+    import torch
+
+    model.train()
+    total = 0.0
+    seen = 0
+    for images, targets, target_lengths in loader:
+        log_probs = model(images)
+        time_steps = log_probs.shape[1]
+        input_lengths = torch.full((images.shape[0],), time_steps, dtype=torch.long)
+        losses = criterion(
+            log_probs.transpose(0, 1),
+            targets,
+            input_lengths,
+            target_lengths,
+        )
+        weights = torch.tensor(
+            ctc_sample_weights(targets.tolist(), target_lengths.tolist()),
+            dtype=losses.dtype,
+        )
+        # Match CTCLoss(reduction="mean"), which divides each sample by its length.
+        per_label = losses / target_lengths.to(dtype=losses.dtype).clamp_min(1)
+        loss = (per_label * weights).sum() / weights.sum().clamp_min(1.0)
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+        optimizer.step()
+        total += float(loss.item()) * images.shape[0]
+        seen += images.shape[0]
+    return total / max(seen, 1)
+
+
+def _group_overlap(vectors: np.ndarray, labels: np.ndarray) -> dict:
+    """Leave-one-out L2 neighbor. Rival means the neighbor has another label."""
+    norms = np.sum(vectors * vectors, axis=1)
+    distances = norms[:, None] + norms[None, :] - 2.0 * (vectors @ vectors.T)
+    np.fill_diagonal(distances, np.inf)
+    nearest = np.argmin(distances, axis=1)
+    rival = labels[nearest] != labels
+    classes: dict[str, dict] = {}
+    for label in sorted(set(labels.tolist())):
+        mask = labels == label
+        classes[label] = {
+            "n": int(mask.sum()),
+            "rival_neighbor_rate": float(rival[mask].mean()) if mask.any() else 0.0,
+        }
+    return {
+        "n": int(len(labels)),
+        "rival_neighbor_rate": float(rival.mean()) if len(labels) else 0.0,
+        "classes": classes,
+    }
+
+
+def write_overlap(args: argparse.Namespace) -> int:
+    """Pixel-space overlap of confusable EMNIST glyphs. Not a Bayes ceiling."""
+    import json
+
+    ensure_data(args.data_dir)
+    bank = load_emnist(args.data_dir / "gzip", "test")
+    rng = np.random.default_rng(args.seed)
+    groups = {}
+    for name in CONFUSABLE_GROUPS:
+        chosen_images = []
+        chosen_labels = []
+        for char in name:
+            pool = bank.by_char[char]
+            take = min(args.per_class, int(pool.size))
+            picked = rng.choice(pool, size=take, replace=False)
+            for index in picked:
+                # Inverted 28x28: dark ink on a light field, same size for every glyph.
+                glyph = (255 - bank.images[int(index)]).astype(np.float32).reshape(-1)
+                chosen_images.append(glyph)
+                chosen_labels.append(char)
+        vectors = np.stack(chosen_images).astype(np.float32)
+        groups[name] = _group_overlap(vectors, np.array(chosen_labels))
+    report = {
+        "kind": "pixel nearest-neighbor overlap",
+        "note": (
+            "Share of EMNIST test glyphs whose nearest other glyph in the same "
+            "confusable group has a different label. This is overlap in 28x28 "
+            "pixel space, not a Bayes error ceiling."
+        ),
+        "space": "28x28 inverted EMNIST, L2, leave-one-out inside each group",
+        "per_class": args.per_class,
+        "seed": args.seed,
+        "groups": groups,
+    }
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    for name, group in groups.items():
+        print(
+            f"{name}  rival_neighbor {group['rival_neighbor_rate']:.4f}  n {group['n']}",
+            flush=True,
+        )
+    print(f"wrote {args.out}", flush=True)
+    return 0
 
 
 def train_hand(args: argparse.Namespace) -> int:
@@ -317,8 +467,16 @@ def train_hand(args: argparse.Namespace) -> int:
     emnist_test = load_emnist(args.data_dir / "gzip", "test")
     train_bank = MixedGlyphs(emnist_train, chars_train, extra_prob=0.2)
     hand_count = args.train_size - int(args.train_size * args.replay)
+    confusable_rate = float(getattr(args, "confusable_rate", 0.0))
+    stroke_prob = float(getattr(args, "stroke_prob", 0.0))
     print(f"rendering {hand_count} handwriting lines", flush=True)
-    images, texts = materialize(train_bank, hand_count, seed=30_000 + args.seed)
+    images, texts = materialize(
+        train_bank,
+        hand_count,
+        seed=30_000 + args.seed,
+        confusable_rate=confusable_rate,
+        stroke_prob=stroke_prob,
+    )
     if args.replay > 0:
         fonts = resolve_fonts(TRAIN_FILENAMES, None)
         if len(fonts) < 3:
@@ -356,13 +514,19 @@ def train_hand(args: argparse.Namespace) -> int:
         num_workers=0,
         collate_fn=collate,
     )
-    criterion = nn.CTCLoss(blank=0, zero_infinity=True)
+    weighted = confusable_rate > 0
+    criterion = nn.CTCLoss(
+        blank=0, zero_infinity=True, reduction="none" if weighted else "mean"
+    )
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
     schedule = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(args.epochs, 1))
     best_exact = -1.0
     best_epoch = 0
     for epoch in range(1, args.epochs + 1):
-        loss = run_epoch(model, train_loader, criterion, optimizer)
+        if weighted:
+            loss = _weighted_epoch(model, train_loader, criterion, optimizer)
+        else:
+            loss = run_epoch(model, train_loader, criterion, optimizer)
         schedule.step()
         preds = predict_loader(model, val_loader, val_texts)
         metrics = score_predictions(preds, val_texts)

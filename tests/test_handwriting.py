@@ -4,7 +4,19 @@ from pathlib import Path
 
 import numpy as np
 
-from tinyocr.handwriting import blit_min, crop_ink, read_idx_images, read_idx_labels, read_mapping
+from PIL import Image
+
+from tinyocr.charset import encode
+from tinyocr.handwriting import (
+    blit_min,
+    confusable_line,
+    crop_ink,
+    ctc_sample_weights,
+    read_idx_images,
+    read_idx_labels,
+    read_mapping,
+    render_hand_line,
+)
 
 
 def _write_images(path: Path, images: np.ndarray) -> None:
@@ -37,6 +49,51 @@ def test_mapping_uses_the_uppercase_ascii_column(tmp_path: Path):
     path = tmp_path / "map.txt"
     path.write_text("1 65 97\n0 48\n", encoding="utf-8")
     assert read_mapping(path) == {1: "A", 0: "0"}
+
+
+def test_confusable_line_keeps_two_glyphs():
+    rng = np.random.default_rng(0)
+    for _ in range(40):
+        text = confusable_line(rng)
+        assert 4 <= len(text) <= 8
+        assert sum(char in "O0I1LQ9" for char in text) >= 2
+
+
+def test_ctc_weight_doubles_confusable_labels():
+    plain = encode("AB")
+    mixed = encode("A0")
+    weights = ctc_sample_weights(plain + mixed, [len(plain), len(mixed)])
+    assert weights == [1.0, 2.0]
+
+
+def test_one_pixel_dilate_and_erode():
+    from PIL import ImageFilter
+
+    image = Image.new("L", (5, 5), 255)
+    image.putpixel((2, 2), 0)
+    spread = image.filter(ImageFilter.MinFilter(3))
+    thinned = image.filter(ImageFilter.MaxFilter(3))
+    assert spread.getpixel((2, 2)) == 0
+    assert spread.getpixel((1, 2)) == 0
+    assert thinned.getpixel((2, 2)) == 255
+
+
+def test_render_accepts_a_forced_confusable_line():
+    class _Bank:
+        def sample(self, _char, _rng):
+            glyph = np.full((10, 6), 255, dtype=np.uint8)
+            glyph[2:8, 2:4] = 0
+            return glyph
+
+    image, text = render_hand_line(
+        _Bank(),
+        np.random.default_rng(3),
+        text="O0",
+        stroke_prob=1.0,
+    )
+    assert text == "O0"
+    assert image.mode == "L"
+    assert image.getextrema()[0] < 255
 
 
 def test_crop_and_darker_ink_wins():

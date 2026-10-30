@@ -92,10 +92,24 @@ Charset က `0-9` / `A-Z` အတိုင်းပါ။ လက်ရေးဒ�
 
 စာလုံး 6 လုံးလောက်ရှိတဲ့ လိုင်းမှာ character 87% ဆိုရင် exact က 45% ဝန်းကျင်ရောက်တယ်။ ကျန်တဲ့အမှားက လက်ရေးမှာ ပုံပန်းတူတဲ့ `O`/`0`၊ `I`/`1`/`L`၊ `Q`/`9` ပါ။ ပုံနှိပ်စာ exact က 97.1% ကနေ 95.5% ကို ဆင်းသွားတယ်။
 
+EMNIST test ပေါ်မှာ အဲဒီအုပ်စုတွေကို 28×28 pixel အကွာအဝေးနဲ့ အနီးဆုံးအိမ်နီးချင်းရှာကြည့်တယ်။ အိမ်နီးချင်းက တစ်ခြား label ဖြစ်တဲ့နှုန်း (class တစ်ခုကို 300 လုံး၊ seed 2026) —
+
+| အုပ်စု | rival neighbor |
+| --- | --- |
+| `O` / `0` | 37.3% |
+| `I` / `1` / `L` | 48.2% |
+| `Q` / `9` | 22.0% |
+
+ဒါက pixel space ထဲက ထပ်နေမှုပါ။ Bayes ceiling မဟုတ်ပါ။ `I`/`1`/`L` ရဲ့ ထက်ဝက်နီးပါးက ကိုယ့် class ထက် တစ်ခြား class နဲ့ ပိုနီးတယ်။ 32 pixel အမြင့်မှာ မင်ချင်းတူရင် အမှားကျန်မယ်။
+
+Graph မပြောင်းဘဲ ထပ် fine-tune လုပ်ကြည့်တယ်။ လိုင်း 40% မှာ `O0I1LQ9` ထဲက စာလုံးနှစ်လုံးအနည်းဆုံးထည့်၊ လိုင်းထက်ဝက်ကို 1 pixel ဖောင်း/ပါး၊ အဲဒီလိုင်းတွေရဲ့ CTC ကို 2 ဆ။ Epoch 4, lr 2e-4, seed 2။ ပြန်တိုင်းတဲ့အခါ EMNIST character 87.2% ကနေ 86.9% ကိုဆင်းပြီး Chars74k exact 47.1% ကနေ 45.7% ကိုဆင်းတယ်။ ပုံနှိပ် exact က 95.5% အတိုင်းရှိတယ်။ Latency က shipped model နဲ့ ယှဉ်ရင် p50 0.25 ms အတူတူပါ။ Character က နှစ်ဖက်လုံးမတက်လို့ ဒီ checkpoint ကို မသုံးပါ။ တူညီတဲ့ 32×160 ပုံကို teacher အကြီးနဲ့ ထပ်ကြည့်လည်း 28×28 မှာ တိုက်နေတဲ့ မင်ကို ခွဲမရပါ။
+
 ```bash
 pip install -r requirements-train.txt
 python -m tinyocr train-hand --init artifacts/recognizer.pt --epochs 8 --lr 5e-4 --seed 0
 python -m tinyocr train-hand --init artifacts/handwriting.pt --epochs 4 --lr 2e-4 --seed 1
+python -m tinyocr overlap
+python -m tinyocr train-hand --init artifacts/handwriting.pt --epochs 4 --lr 2e-4 --seed 2 --confusable-rate 0.4 --stroke-prob 0.5
 python -m tinyocr bench-hand
 python -m tinyocr read --model artifacts/handwriting.onnx samples/handwriting/7F2K.png
 ```

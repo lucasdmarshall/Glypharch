@@ -1,0 +1,55 @@
+{
+  "kind": "pixel nearest-neighbor overlap",
+  "note": "Share of EMNIST test glyphs whose nearest other glyph in the same confusable group has a different label. This is overlap in 28x28 pixel space, not a Bayes error ceiling.",
+  "space": "28x28 inverted EMNIST, L2, leave-one-out inside each group",
+  "per_class": 300,
+  "seed": 2026,
+  "groups": {
+    "O0": {
+      "n": 600,
+      "rival_neighbor_rate": 0.37333333333333335,
+      "classes": {
+        "0": {
+          "n": 300,
+          "rival_neighbor_rate": 0.38666666666666666
+        },
+        "O": {
+          "n": 300,
+          "rival_neighbor_rate": 0.36
+        }
+      }
+    },
+    "I1L": {
+      "n": 900,
+      "rival_neighbor_rate": 0.4822222222222222,
+      "classes": {
+        "1": {
+          "n": 300,
+          "rival_neighbor_rate": 0.4633333333333333
+        },
+        "I": {
+          "n": 300,
+          "rival_neighbor_rate": 0.44666666666666666
+        },
+        "L": {
+          "n": 300,
+          "rival_neighbor_rate": 0.5366666666666666
+        }
+      }
+    },
+    "Q9": {
+      "n": 600,
+      "rival_neighbor_rate": 0.22,
+      "classes": {
+        "9": {
+          "n": 300,
+          "rival_neighbor_rate": 0.16
+        },
+        "Q": {
+          "n": 300,
+          "rival_neighbor_rate": 0.28
+        }
+      }
+    }
+  }
+}
