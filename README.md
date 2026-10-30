@@ -116,6 +116,30 @@ python -m tinyocr read --model artifacts/handwriting.onnx samples/handwriting/7F
 
 `train-hand` က `data/handwriting/` ထဲကို EMNIST zip နဲ့ Chars74k ကို မရှိသေးရင် ဒေါင်းပြီး၊ လိုင်းဆွဲ၊ fine-tune လုပ်၊ ONNX ပြန်ထုတ်တယ်။ Raw ဒေတာကို git ထဲ မထည့်ပါ။
 
+## အမြင့် 64
+
+32px model နှစ်ခုကို ဒီအတိုင်းထားတယ်။ Chars74k လို ပိုကြည်တဲ့ လိုင်းအတွက် pool တစ်လွှာ ထပ်ထားတဲ့ graph ကို သီးသန့်စမ်းတယ်။ Input `1×64×160`၊ time step 40၊ parameter 393,093။ စာလုံးအမြင့် 40–64၊ Chars74k ကို အမြင့် 128 အထိထားပြီး စာရေးသူ 1–45 နဲ့ သင်တယ်။ EMNIST က 28px မူရင်းဖြစ်လို့ ဒီ graph ရဲ့ ပစ်မှတ် မဟုတ်ပါ။ လိုင်း 40% မှာ `O0I1LQ9` ထဲက စာလုံးနှစ်လုံးအနည်းဆုံး၊ လိုင်းထက်ဝက်ကို 1 pixel ဖောင်း/ပါး၊ ပုံနှိပ် replay 20%။ Epoch 8, lr 5e-4, seed 3။ အစက `artifacts/handwriting.pt`။
+
+4-core Xeon, thread 4, batch 1 မှာ p50 **0.57 ms**, p95 **0.86 ms**။ 1 ms အောက်ရောက်တယ်။
+
+| စမ်းသပ်ချက် | exact | character | n |
+| --- | --- | --- | --- |
+| 64px, Chars74k စာရေးသူ 46–55, glyph 40–64 | 50.4% | 88.8% | 1000 |
+| တူညီတဲ့ပုံ, 32px model | 29.1% | 79.9% | 1000 |
+| ပုံနှိပ်စာ, 64px | 81.7% | 96.6% | 1000 |
+| တူညီတဲ့ပုံနှိပ်စာ, 32px | 95.5% | 99.2% | 1000 |
+
+တူညီတဲ့ မင်ပေါ်မှာ character က 79.9% ကနေ 88.8% ရောက်တယ်။ အရင် 32px bench ရဲ့ 87.7% နဲ့ယှဉ်ရင် 88.8% ဖြစ်ပြီး သတ်မှတ်ထားတဲ့ 89.7% မပြည့်သေးပါ။ ပုံနှိပ် exact က 81.7% ဖြစ်လို့ 94% အဆင့်မပြည့်ပါ။ လက်ခံချက်က character 89.7%၊ ပုံနှိပ် exact 94%၊ p50 1 ms အောက် သုံးခုလုံးပါ။ ဒီ run က latency ပဲ ပြည့်တယ်။ Shipped လက်ရေးဖိုင်က `artifacts/handwriting.onnx` အတိုင်းပါ။ ဂဏန်းအပြည့်အစုံက `artifacts/detail-metrics.json` မှာရှိတယ်။
+
+ကွက်ပုံစံသိပြီးသားဆိုရင် greedy decode မတိုင်ခင် class ကို mask လုပ်တယ်။ ဂဏန်းကွက်က `O` အပါအဝင် စာလုံးအားလုံးကို ပိတ်တယ်။ စာလုံးကွက်က `0` နဲ့ `1` အပါအဝင် ဂဏန်းအားလုံးကို ပိတ်တယ်။ Random code bench က charset အပြည့်နဲ့ တိုင်းတယ်။
+
+```bash
+python -m tinyocr read --alphabet digits samples/7F2K.png
+python -m tinyocr read --alphabet letters samples/7F2K.png
+python -m tinyocr train-detail
+python -m tinyocr bench-detail
+```
+
 ## ပုံဝင်လာပုံ
 
 `prepare_line` က grayscale ပြောင်း၊ အမြင့် 32 ဖြစ်အောင် အချိုးကျချုံ့၊ အကျယ် 160 မပြည့်ရင် ညာဘက်ကို ဖုံး၊ ပျမ်းမျှအလင်း 0.5 အောက်ဆိုရင် အလင်းအမှောင် ပြန်လှန်တယ်။ သင်တဲ့အချိန်နဲ့ ဖတ်တဲ့အချိန်မှာ ဒီ function တစ်ခုတည်းကို သုံးတယ်။

@@ -1,0 +1,221 @@
+{
+  "model": "artifacts/detail.onnx",
+  "baseline": "artifacts/handwriting.onnx",
+  "latency": {
+    "n": 200,
+    "mean_ms": 0.6115501498879894,
+    "p50_ms": 0.5668575004165177,
+    "p95_ms": 0.8557405987630773,
+    "min_ms": 0.548404999790364,
+    "threads": 4
+  },
+  "chars74k_heldout_writers": {
+    "n": 1000,
+    "exact_accuracy": 0.504,
+    "character_accuracy": 0.8881874065459379,
+    "character_error_rate": 0.11181259345406214,
+    "top_substitutions": [
+      {
+        "change": "O->0",
+        "count": 75
+      },
+      {
+        "change": "0->O",
+        "count": 46
+      },
+      {
+        "change": "G->9",
+        "count": 24
+      },
+      {
+        "change": "L->1",
+        "count": 22
+      },
+      {
+        "change": "L->I",
+        "count": 21
+      },
+      {
+        "change": "Q->9",
+        "count": 20
+      },
+      {
+        "change": "W->U",
+        "count": 18
+      },
+      {
+        "change": "B->6",
+        "count": 17
+      }
+    ],
+    "writers": "46-55",
+    "render": "chars74k native cap 128, glyph height 40-64, input 64x160"
+  },
+  "chars74k_same_ink_32px": {
+    "n": 1000,
+    "exact_accuracy": 0.291,
+    "character_accuracy": 0.7988037880046519,
+    "character_error_rate": 0.20119621199534807,
+    "top_substitutions": [
+      {
+        "change": "0->O",
+        "count": 96
+      },
+      {
+        "change": "6->G",
+        "count": 47
+      },
+      {
+        "change": "O->0",
+        "count": 33
+      },
+      {
+        "change": "9->Q",
+        "count": 28
+      },
+      {
+        "change": "1->7",
+        "count": 28
+      },
+      {
+        "change": "1->L",
+        "count": 22
+      },
+      {
+        "change": "9->G",
+        "count": 21
+      },
+      {
+        "change": "S->B",
+        "count": 20
+      }
+    ],
+    "model": "artifacts/handwriting.onnx",
+    "render": "same PIL lines prepared at 32x160"
+  },
+  "printed_replay_check": {
+    "n": 1000,
+    "exact_accuracy": 0.817,
+    "character_accuracy": 0.9655459387483356,
+    "character_error_rate": 0.03445406125166445,
+    "top_substitutions": [
+      {
+        "change": "0->O",
+        "count": 26
+      },
+      {
+        "change": "O->0",
+        "count": 16
+      },
+      {
+        "change": "I->L",
+        "count": 16
+      },
+      {
+        "change": "L->I",
+        "count": 13
+      },
+      {
+        "change": "N->M",
+        "count": 6
+      },
+      {
+        "change": "J->I",
+        "count": 4
+      },
+      {
+        "change": "F->T",
+        "count": 3
+      },
+      {
+        "change": "V->W",
+        "count": 3
+      }
+    ]
+  },
+  "printed_same_ink_32px": {
+    "n": 1000,
+    "exact_accuracy": 0.955,
+    "character_accuracy": 0.9923435419440746,
+    "character_error_rate": 0.007656458055925432,
+    "top_substitutions": [
+      {
+        "change": "O->0",
+        "count": 15
+      },
+      {
+        "change": "L->I",
+        "count": 8
+      },
+      {
+        "change": "0->O",
+        "count": 7
+      },
+      {
+        "change": "I->L",
+        "count": 3
+      },
+      {
+        "change": "M->L",
+        "count": 1
+      },
+      {
+        "change": "Y->W",
+        "count": 1
+      }
+    ]
+  },
+  "printed_large_font": {
+    "n": 1000,
+    "exact_accuracy": 0.903,
+    "character_accuracy": 0.9823568575233023,
+    "character_error_rate": 0.017643142476697737,
+    "top_substitutions": [
+      {
+        "change": "O->0",
+        "count": 21
+      },
+      {
+        "change": "L->I",
+        "count": 13
+      },
+      {
+        "change": "I->L",
+        "count": 10
+      },
+      {
+        "change": "0->O",
+        "count": 9
+      },
+      {
+        "change": "M->N",
+        "count": 4
+      },
+      {
+        "change": "W->V",
+        "count": 3
+      },
+      {
+        "change": "O->C",
+        "count": 3
+      },
+      {
+        "change": "C->O",
+        "count": 2
+      }
+    ]
+  },
+  "gates": {
+    "chars_character": 0.8966000000000001,
+    "paired_gain": 0.02,
+    "printed_exact": 0.94,
+    "p50_ms": 1.0,
+    "reasons": {
+      "chars_character_at_least_89.7": false,
+      "chars_character_beats_same_ink_by_2_points": true,
+      "printed_exact_at_least_94": false,
+      "p50_under_1ms": true
+    },
+    "accepted": false
+  }
+}

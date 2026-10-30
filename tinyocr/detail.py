@@ -313,37 +313,47 @@ def bench_detail(args: argparse.Namespace) -> int:
 
     printed_detail = None
     printed_paired = None
+    printed_large = None
     fonts = resolve_fonts(TRAIN_FILENAMES, None)
-    if len(fonts) >= 3:
-        source = SynthSource(fonts, sizes=DETAIL_FONT_SIZES)
+
+    def score_printed(source: SynthSource, label: str) -> tuple[dict, dict | None]:
         printed_pils: list[Image.Image] = []
         printed_texts: list[str] = []
         printed_n = min(args.n, 1000)
-        print(f"rendering {printed_n} printed lines", flush=True)
+        print(f"rendering {printed_n} {label} printed lines", flush=True)
         for index in range(printed_n):
             image, text = source.render_sample(index, args.seed + 2, STANDARD)
             printed_pils.append(image)
             printed_texts.append(text)
-        printed_detail = _score_batch(
+        detail_score = _score_batch(
             session, spec, _stack(printed_pils, DETAIL_H, DETAIL_W), printed_texts
         )
         print(
-            f"printed detail  exact {printed_detail['exact_accuracy']:.4f}  "
-            f"char {printed_detail['character_accuracy']:.4f}",
+            f"{label} detail  exact {detail_score['exact_accuracy']:.4f}  "
+            f"char {detail_score['character_accuracy']:.4f}",
             flush=True,
         )
+        base_score = None
         if args.baseline.is_file():
-            printed_paired = _score_batch(
+            base_score = _score_batch(
                 base_session,
                 base_spec,
                 _stack(printed_pils, IMG_H, IMG_W),
                 printed_texts,
             )
             print(
-                f"printed 32px    exact {printed_paired['exact_accuracy']:.4f}  "
-                f"char {printed_paired['character_accuracy']:.4f}",
+                f"{label} 32px    exact {base_score['exact_accuracy']:.4f}  "
+                f"char {base_score['character_accuracy']:.4f}",
                 flush=True,
             )
+        return detail_score, base_score
+
+    if len(fonts) >= 3:
+        # The 94% gate is the same printed distribution as the shipped bench.
+        printed_detail, printed_paired = score_printed(SynthSource(fonts), "printed")
+        printed_large, _printed_large_paired = score_printed(
+            SynthSource(fonts, sizes=DETAIL_FONT_SIZES), "printed-large"
+        )
 
     detail_char = float(chars_detail["character_accuracy"])
     paired_char = None if paired is None else float(paired["character_accuracy"])
@@ -367,6 +377,7 @@ def bench_detail(args: argparse.Namespace) -> int:
         "chars74k_same_ink_32px": paired,
         "printed_replay_check": printed_detail,
         "printed_same_ink_32px": printed_paired,
+        "printed_large_font": printed_large,
         "gates": {
             "chars_character": GATE_CHARS_CHAR,
             "paired_gain": PAIRED_GAIN,
